@@ -5,6 +5,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "db:migrate": "node scripts/migrate.js",
     "seed:admin": "node scripts/seedSuperAdmin.js"
   },
   "dependencies": {
