@@ -1,10 +1,10 @@
 const Driver = require('../models/driverModel');
+const Terminal = require('../models/terminalModel');
 const { logAudit } = require('../utils/audit');
 const { isCnic, isFutureDate, isLicenseNumber, isPersonName, isPhone, isPositiveId, normalizeText } = require('../utils/validation');
 
 exports.getAllDrivers = (req, res) => {
-  const cityFilter = req.user.role === 'super_admin' ? null : req.user.city_id;
-  Driver.getalldrivers(cityFilter, (err, results) => {
+  Driver.getalldrivers(req.user, (err, results) => {
     if (err) return res.status(500).send({ error: err });
     res.json(results);
   });
@@ -12,6 +12,7 @@ exports.getAllDrivers = (req, res) => {
 
 exports.createDriver = (req, res) => {
   const cityId = req.user.role === 'super_admin' ? req.body.city_id : req.user.city_id;
+  const homeTerminalId = req.body.home_terminal_id;
   const name = normalizeText(req.body.name);
   const cnicDigits = String(req.body.cnic || '').replace(/\D/g, '');
   const licenseNumber = String(req.body.license_number || '').trim();
@@ -22,22 +23,30 @@ exports.createDriver = (req, res) => {
   if (!isLicenseNumber(licenseNumber)) return res.status(400).send({ message: 'Enter a valid license number' });
   if (!isFutureDate(expiry)) return res.status(400).send({ message: 'License expiry must be a valid future date' });
   if (!isPhone(phone)) return res.status(400).send({ message: 'Enter a valid driver phone number' });
-  if (!isPositiveId(cityId)) return res.status(400).send({ message: 'A valid city_id is required' });
+  if (!isPositiveId(cityId) || !isPositiveId(homeTerminalId)) {
+    return res.status(400).send({ message: 'A valid city and starting terminal are required' });
+  }
 
   const cnic = `${cnicDigits.slice(0, 5)}-${cnicDigits.slice(5, 12)}-${cnicDigits.slice(12)}`;
 
-  Driver.createdriver({ ...req.body, name, cnic, phone: phone || null, license_number: licenseNumber, license_expiry_date: expiry, city_id: cityId }, (err, result) => {
-    if (err) return res.status(500).send({ error: err });
-    if (!result.success && result.reason === 'DUPLICATE') {
-      return res.status(400).send({ message: 'A driver with this CNIC or license number already exists' });
+  Terminal.getterminalbyIDInScope(homeTerminalId, req.user, (terminalError, terminalRows) => {
+    if (terminalError) return res.status(500).send({ error: terminalError });
+    if (!terminalRows.length || String(terminalRows[0].city_id) !== String(cityId)) {
+      return res.status(400).send({ message: 'The starting terminal must belong to the selected city' });
     }
-    logAudit(req.user.id, req.user.name, 'Driver Creation', 'Driver', result.insertedId, req.body.name);
-    res.status(201).send({ message: 'Driver created successfully', driverId: result.insertedId });
+    Driver.createdriver({ ...req.body, name, cnic, phone: phone || null, license_number: licenseNumber, license_expiry_date: expiry, city_id: cityId, home_terminal_id: homeTerminalId }, (err, result) => {
+      if (err) return res.status(500).send({ error: err });
+      if (!result.success && result.reason === 'DUPLICATE') {
+        return res.status(400).send({ message: 'A driver with this CNIC or license number already exists' });
+      }
+      logAudit(req.user.id, req.user.name, 'Driver Creation', 'Driver', result.insertedId, req.body.name);
+      res.status(201).send({ message: 'Driver created successfully', driverId: result.insertedId });
+    });
   });
 };
 
 exports.toggleDriverStatus = (req, res) => {
-  Driver.toggledriverstatus(req.params.id, (err, result) => {
+  Driver.toggledriverstatus(req.params.id, req.user, (err, result) => {
     if (err) return res.status(500).send({ error: err });
     if (!result.success) return res.status(404).send({ message: 'Driver not found' });
     logAudit(req.user.id, req.user.name, 'Driver Modification', 'Driver', req.params.id, `→ ${result.newStatus}`);

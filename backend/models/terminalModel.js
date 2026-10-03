@@ -1,15 +1,31 @@
 const db = require('../config/db');
+const { terminalScope } = require('../utils/accessScope');
 
-exports.getallterminal = (cityId, cb) => {
-  if (cityId) {
-    db.query('SELECT * FROM terminals WHERE city_id = ?', [cityId], cb);
-  } else {
-    db.query('SELECT * FROM terminals', cb);
-  }
+exports.getallterminal = (user, requestedCityId, cb) => {
+  const scope = terminalScope(user, 't');
+  const cityFilter = requestedCityId ? ' AND t.city_id = ?' : '';
+  const params = requestedCityId ? [...scope.params, requestedCityId] : scope.params;
+  db.query(`SELECT t.* FROM terminals t WHERE ${scope.sql}${cityFilter}`, params, cb);
+};
+
+exports.getRouteDestinations = (cb) => {
+  db.query(
+    `SELECT t.id, t.name, t.city_id, c.name AS city_name
+     FROM terminals t
+     JOIN cities c ON c.id = t.city_id
+     WHERE t.status = 'Active'
+     ORDER BY c.name, t.name`,
+    cb
+  );
 };
 
 exports.getterminalbyID = (id, cb) => {
   db.query('SELECT * FROM terminals WHERE id = ?', [id], cb);
+};
+
+exports.getterminalbyIDInScope = (id, user, cb) => {
+  const scope = terminalScope(user, 't');
+  db.query(`SELECT t.* FROM terminals t WHERE t.id = ? AND ${scope.sql}`, [id, ...scope.params], cb);
 };
 
 exports.createterminal = (terminal, cb) => {
@@ -30,9 +46,10 @@ exports.createterminal = (terminal, cb) => {
   });
 };
 
-exports.updateterminal = (id, terminal, cb) => {
+exports.updateterminal = (id, terminal, user, cb) => {
   const { name, address, phone, status } = terminal;
-  db.query('SELECT city_id FROM terminals WHERE id = ?', [id], (err, rows) => {
+  const scope = terminalScope(user, 't');
+  db.query(`SELECT t.city_id FROM terminals t WHERE t.id = ? AND ${scope.sql}`, [id, ...scope.params], (err, rows) => {
     if (err) return cb(err);
     if (rows.length === 0) return cb(null, { success: true, affectedRows: 0 });
 
@@ -44,8 +61,9 @@ exports.updateterminal = (id, terminal, cb) => {
         if (duplicates.length > 0) return cb(null, { success: false, reason: 'DUPLICATE' });
 
         db.query(
-          'UPDATE terminals SET name = ?, address = ?, phone = ?, status = ? WHERE id = ?',
-          [name, address, phone, status, id],
+          `UPDATE terminals t SET name = ?, address = ?, phone = ?, status = ?
+           WHERE t.id = ? AND ${scope.sql}`,
+          [name, address, phone, status, id, ...scope.params],
           (err3, result) => {
             if (err3) return cb(err3);
             cb(null, { success: true, affectedRows: result.affectedRows });

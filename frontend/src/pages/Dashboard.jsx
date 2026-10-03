@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useLookups } from '../context/LookupsContext';
 import * as reportApi from '../api/reportApi';
-import { routeName, vehName, drvName, money, fmtDT } from '../utils/lookups';
+import { routeName, scheduleVehicleName, drvName, money, fmtDT } from '../utils/lookups';
+import DataGrid from '../components/DataGrid';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { routes, vehicles, drivers } = useLookups();
   const [d, setD] = useState(null);
+  const [directionFilter, setDirectionFilter] = useState('all');
 
   useEffect(() => {
     reportApi.getTodayDashboard().then((res) => setD(res.data));
@@ -30,26 +32,25 @@ export default function Dashboard() {
         <div className="kpi"><b>{d.active_routes}</b><span>Active routes</span></div>
       </div>
       <div className="card">
-        <div className="hd"><h3>Upcoming departures</h3></div>
+        <div className="hd"><h3>Upcoming arrivals and departures</h3></div>
         <div className="bd">
-          {d.upcoming.length ? (
-            <table>
-              <tbody>
-                <tr><th>Route</th><th>Departure</th><th>Vehicle</th><th>Driver</th><th>Fare</th></tr>
-                {d.upcoming.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.route_name || routeName(s.route_id, routes)}</td>
-                    <td>{fmtDT(s.departure_datetime)}</td>
-                    <td>{s.vehicle_number || vehName(s.vehicle_id, vehicles)}</td>
-                    <td>{s.driver_name || drvName(s.driver_id, drivers)}</td>
-                    <td>{money(s.fare)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="empty">No upcoming departures in scope.</div>
-          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <select aria-label="Filter upcoming events by direction" value={directionFilter} onChange={(event) => setDirectionFilter(event.target.value)} style={{ width: 190 }}>
+              <option value="all">All events</option>
+              <option value="Departure">Departures</option>
+              <option value="Arrival">Arrivals</option>
+            </select>
+          </div>
+          <DataGrid data={d.upcoming.filter((event) => directionFilter === 'all' || event.direction === directionFilter)} columns={[
+            { accessorKey: 'direction', header: 'Type' },
+            { id: 'route', header: 'Route', accessorFn: (schedule) => schedule.route_name || routeName(schedule.route_id, routes) },
+            { accessorKey: 'event_datetime', header: 'Time', cell: ({ row }) => fmtDT(row.original.event_datetime) },
+            { id: 'from', header: 'From', accessorFn: (schedule) => `${schedule.departure_city_name} · ${schedule.departure_terminal_name}` },
+            { id: 'to', header: 'To', accessorFn: (schedule) => `${schedule.arrival_city_name} · ${schedule.arrival_terminal_name}` },
+            { id: 'vehicle', header: 'Vehicle', accessorFn: (schedule) => scheduleVehicleName(schedule, vehicles) },
+            { id: 'driver', header: 'Driver', accessorFn: (schedule) => schedule.driver_name || drvName(schedule.driver_id, drivers) },
+            { accessorKey: 'fare', header: 'Fare', accessorFn: (schedule) => Number(schedule.fare), cell: ({ row }) => money(row.original.fare) }
+          ]} emptyMessage="No upcoming arrivals or departures in scope." />
         </div>
       </div>
     </>

@@ -5,6 +5,7 @@ import * as userApi from '../api/userApi';
 import { cityName, termName } from '../utils/lookups';
 import { normalizeText, normalizedKey, PERSON_NAME_PATTERN, PHONE_PATTERN, USERNAME_PATTERN } from '../utils/validation';
 import Modal from '../components/Modal';
+import DataGrid from '../components/DataGrid';
 
 const ROLE_LABEL = { super_admin: 'Super Admin', city_admin: 'City Admin', counter_operator: 'Counter Operator' };
 const MODULES = ['Fleet', 'Driver', 'Route', 'Schedule', 'Booking', 'Reports', 'User'];
@@ -16,6 +17,7 @@ export default function Users() {
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ role: 'city_admin' });
   const [err, setErr] = useState('');
+  const cityTerminals = terminals.filter((terminal) => String(terminal.city_id) === String(form.city_id));
 
   function refresh() { userApi.listUsers().then((r) => setUsers(r.data)); }
   useEffect(refresh, []);
@@ -24,6 +26,11 @@ export default function Users() {
     setErr('');
     const name = normalizeText(form.name || '');
     const username = (form.username || '').trim().toLowerCase();
+    const cityId = form.city_id || cities[0]?.id;
+    const selectedTerminal = cityTerminals.find((terminal) => String(terminal.id) === String(form.terminal_id));
+    if (form.role === 'counter_operator' && !selectedTerminal) {
+      return setErr('Select a terminal in the selected city.');
+    }
     if (users.some((existing) => normalizedKey(existing.username) === normalizedKey(username))) {
       return setErr('That username is already in use. Choose another username.');
     }
@@ -31,8 +38,8 @@ export default function Users() {
       await userApi.createUser({
         name, username, password: form.password, phone: (form.phone || '').trim(),
         role: form.role,
-        city_id: form.role === 'super_admin' ? null : form.city_id || cities[0]?.id,
-        terminal_id: form.role === 'counter_operator' ? form.terminal_id || terminals[0]?.id : null
+        city_id: form.role === 'super_admin' ? null : cityId,
+        terminal_id: form.role === 'counter_operator' ? selectedTerminal.id : null
       });
       setModal(false); setForm({ role: 'city_admin' }); setErr(''); refresh();
     } catch (e) { setErr(e.response?.data?.message || e.message); }
@@ -49,18 +56,17 @@ export default function Users() {
         <button className="btn" onClick={() => { setForm({ role: 'city_admin', name: '', username: '', password: '', phone: '', city_id: '', terminal_id: '' }); setErr(''); setModal(true); }}>+ Create User</button>
       </div>
       <div className="card"><div className="bd">
-        <table><tbody>
-          <tr><th>Name</th><th>Username</th><th>Role</th><th>Scope</th><th>Status</th><th></th></tr>
-          {users.map((u) => (
-            <tr key={u.id}>
-              <td><b>{u.name}</b></td><td>{u.username}</td>
-              <td><span className="tag">{ROLE_LABEL[u.role]}</span></td>
-              <td>{u.city_id ? cityName(u.city_id, cities) : 'All Cities'}{u.terminal_id ? ' · ' + termName(u.terminal_id, terminals) : ''}</td>
-              <td><span className={`badge ${u.status === 'Active' ? 'b-ok' : 'b-danger'}`}>{u.status}</span></td>
-              <td><button className="btn sm gh" onClick={() => toggle(u)}>{u.status === 'Active' ? 'Deactivate' : 'Activate'}</button></td>
-            </tr>
-          ))}
-        </tbody></table>
+        <DataGrid
+          data={users}
+          columns={[
+            { accessorKey: 'name', header: 'Name', cell: ({ row }) => <b>{row.original.name}</b> },
+            { accessorKey: 'username', header: 'Username' },
+            { id: 'role', header: 'Role', accessorFn: (account) => ROLE_LABEL[account.role], cell: ({ row }) => <span className="tag">{ROLE_LABEL[row.original.role]}</span> },
+            { id: 'scope', header: 'Scope', accessorFn: (account) => `${account.city_id ? cityName(account.city_id, cities) : 'All Cities'}${account.terminal_id ? ` · ${termName(account.terminal_id, terminals)}` : ''}` },
+            { accessorKey: 'status', header: 'Status', cell: ({ row }) => <span className={`badge ${row.original.status === 'Active' ? 'b-ok' : 'b-danger'}`}>{row.original.status}</span> },
+            { id: 'actions', header: '', enableSorting: false, enableColumnFilter: false, cell: ({ row }) => <button className="btn sm gh" onClick={() => toggle(row.original)}>{row.original.status === 'Active' ? 'Deactivate' : 'Activate'}</button> }
+          ]}
+        />
       </div></div>
 
       {modal && (
@@ -79,7 +85,7 @@ export default function Users() {
             </div>
             {form.role !== 'super_admin' && (
               <div className="fld"><label>City</label>
-                <select required value={form.city_id || ''} onChange={(e) => setForm((f) => ({ ...f, city_id: e.target.value }))}>
+                <select required value={form.city_id || ''} onChange={(e) => setForm((f) => ({ ...f, city_id: e.target.value, terminal_id: '' }))}>
                   <option value="">Select a city</option>
                   {cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
@@ -87,9 +93,9 @@ export default function Users() {
             )}
             {form.role === 'counter_operator' && (
               <div className="fld"><label>Terminal</label>
-                <select required value={form.terminal_id || ''} onChange={(e) => setForm((f) => ({ ...f, terminal_id: e.target.value }))}>
+                <select required value={form.terminal_id || ''} disabled={!form.city_id || cityTerminals.length === 0} onChange={(e) => setForm((f) => ({ ...f, terminal_id: e.target.value }))}>
                   <option value="">Select a terminal</option>
-                  {terminals.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {cityTerminals.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
             )}

@@ -22,9 +22,6 @@ tr:hover td{background:#fafcfb}
 .lbox{background:#fff;border-radius:12px;padding:36px;width:380px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .lbox h1{color:var(--brand-d);font-size:22px;margin-bottom:2px}
 .lbox p{color:var(--slate);font-size:13px;margin-bottom:22px}
-.roles{display:flex;gap:8px;margin-bottom:18px}
-.rolebtn{flex:1;padding:10px 6px;border:1px solid var(--line);border-radius:8px;background:#fafcfb;font-size:11.5px;font-weight:700;color:var(--slate);text-align:center;cursor:pointer}
-.rolebtn.on{border-color:var(--brand);background:var(--brand-l);color:var(--brand-d)}
 .err{color:var(--danger);font-size:12.5px;margin-top:8px}
 .side{position:fixed;left:0;top:0;bottom:0;width:224px;background:var(--brand-d);padding:16px 10px;overflow-y:auto}
 .side .brand{color:#fff;font-weight:800;font-size:16px;padding:8px 10px 16px;border-bottom:1px solid rgba(255,255,255,.15);margin-bottom:10px}
@@ -35,6 +32,7 @@ tr:hover td{background:#fafcfb}
 .nav a.on{background:var(--brand);color:#fff;font-weight:700}
 .userbox{border-top:1px solid rgba(255,255,255,.15);margin-top:12px;padding-top:12px;color:#c6dcd6;font-size:12px}
 .userbox b{color:#fff;display:block;font-size:13px}
+.userbox small{display:block;margin-top:4px;color:#a9c5bd;line-height:1.4}
 .userbox button{color:#f3b6ab;font-size:12px;margin-top:6px;text-decoration:underline;background:none}
 .main{margin-left:224px;padding:24px 30px 60px}
 .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--line)}
@@ -63,12 +61,33 @@ tr:hover td{background:#fafcfb}
 .seat.avail:hover{border-color:var(--brand)}
 .seat.sel{background:var(--brand);color:#fff;border-color:var(--brand)}
 .seat.booked{background:#eceff0;color:var(--mut);cursor:not-allowed}
+.seat.booked.male{background:#dceeff;color:#174d78;border-color:#79abd1}
+.seat.booked.female{background:#fbe4ee;color:#7b2948;border-color:#d887a7}
+.seat.booked.other{background:#e9e5f5;color:#4e3d70;border-color:#9e8bbd}
+.seat-legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--slate);margin-top:6px}
+.seat-legend span{display:inline-flex;align-items:center;gap:4px}
+.seat-key{display:inline-block;width:12px;height:12px;border:1px solid var(--line);border-radius:2px}
+.seat-key.selected{background:var(--brand);border-color:var(--brand)}
+.seat-key.available{background:#fff}
+.seat-key.booked-male{background:#dceeff;border-color:#79abd1}
+.seat-key.booked-female{background:#fbe4ee;border-color:#d887a7}
+.seat-key.booked-other{background:#e9e5f5;border-color:#9e8bbd}
 .empty{color:var(--mut);font-size:13px;padding:18px;text-align:center}
 .tag{font-size:11px;background:var(--brand-l);color:var(--brand-d);padding:2px 8px;border-radius:10px;font-weight:700}
 .tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--line)}
 .tab{padding:9px 14px;font-size:13px;font-weight:600;color:var(--slate);border-bottom:2px solid transparent;cursor:pointer}
 .tab.on{color:var(--brand-d);border-color:var(--brand)}
+.data-grid-toolbar{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.data-grid-filter-form{display:grid;grid-template-columns:minmax(130px,1fr) minmax(130px,.8fr) minmax(160px,1.5fr) auto;gap:8px;align-items:center}
+.data-grid-active-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.data-grid-filter-chip{background:var(--brand-l);color:var(--brand-d);padding:5px 9px;border-radius:16px;font-size:11px}
+.data-grid-heading{background:none;color:inherit;text-transform:inherit;font-weight:inherit;font-size:inherit;padding:0;text-align:left}
+.data-grid-heading:disabled{cursor:default}
+.data-grid-scroll{overflow-x:auto}
+.data-grid-count{font-size:11px;color:var(--mut);text-align:right;padding-top:8px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .ticket{border:2px dashed var(--brand);border-radius:8px;padding:16px}
 .ticket h4{color:var(--brand-d);font-size:16px}
 .ticket .row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px dotted var(--line)}
 @media print{.side,.ph,.no-print{display:none!important}.main{margin:0;padding:0}}
+@media(max-width:760px){.data-grid-filter-form{grid-template-columns:1fr 1fr}.data-grid-filter-form input{grid-column:span 2}}

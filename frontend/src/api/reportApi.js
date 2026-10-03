@@ -23,3 +23,8 @@ export function getDriverPerformance() {
 export function getCashCollection() {
   return http.get('/reports/cash-collection');
 }
+
+export function getTripHistory(filters = {}) {
+  const query = new URLSearchParams(filters);
+  return http.get(`/reports/trip-history?${query}`);
+}

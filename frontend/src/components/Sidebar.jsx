@@ -1,11 +1,19 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLookups } from '../context/LookupsContext';
 import { NAV_ITEMS } from '../routes/AppRoutes';
+import { cityName, termName } from '../utils/lookups';
 
 const ROLE_LABEL = { super_admin: 'Super Admin', city_admin: 'City Admin', counter_operator: 'Counter Operator' };
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
+  const { cities, terminals } = useLookups();
+  const accessLocation = user.role === 'super_admin'
+    ? 'All cities'
+    : user.role === 'counter_operator'
+      ? `${cityName(user.city_id, cities)} · ${termName(user.terminal_id, terminals)}`
+      : `${cityName(user.city_id, cities)} · All city terminals`;
   return (
     <div className="side">
       <div className="brand">
@@ -22,6 +30,7 @@ export default function Sidebar() {
       <div className="userbox">
         <b>{user.name}</b>
         {ROLE_LABEL[user.role]}
+        <small>{accessLocation}</small>
         <button onClick={logout}>Sign out</button>
       </div>
     </div>

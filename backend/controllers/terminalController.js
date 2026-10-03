@@ -3,24 +3,25 @@ const { logAudit } = require('../utils/audit');
 const { isPhone, isPositiveId, isTerminalName, normalizeText } = require('../utils/validation');
 
 exports.getAllTerminal = (req, res) => {
-  // Scoping: super_admin sees everything (optionally filtered by ?city_id=),
-  // city_admin is force-scoped to their own city regardless of query params.
-  const cityFilter = req.user.role === 'super_admin' ? (req.query.city_id || null) : req.user.city_id;
-  Terminal.getallterminal(cityFilter, (err, results) => {
+  Terminal.getallterminal(req.user, req.query.city_id, (err, results) => {
+    if (err) return res.status(500).send({ error: err });
+    res.json(results);
+  });
+};
+
+exports.getRouteDestinations = (req, res) => {
+  Terminal.getRouteDestinations((err, results) => {
     if (err) return res.status(500).send({ error: err });
     res.json(results);
   });
 };
 
 exports.getTerminalByID = (req, res) => {
-  Terminal.getterminalbyID(req.params.id, (err, results) => {
+  Terminal.getterminalbyIDInScope(req.params.id, req.user, (err, results) => {
     if (err) return res.status(500).send({ error: err });
     if (results.length === 0) return res.status(404).send({ message: 'Terminal not found' });
 
     const terminal = results[0];
-    if (req.user.role === 'city_admin' && terminal.city_id !== req.user.city_id) {
-      return res.status(403).send({ message: 'Forbidden' });
-    }
     res.json(terminal);
   });
 };
@@ -48,7 +49,7 @@ exports.updateTerminal = (req, res) => {
   if (!isTerminalName(name)) return res.status(400).send({ message: 'Terminal name contains invalid characters' });
   if (!isPhone(phone)) return res.status(400).send({ message: 'Enter a valid terminal phone number' });
 
-  Terminal.updateterminal(req.params.id, { ...req.body, name, phone: phone || null }, (err, result) => {
+  Terminal.updateterminal(req.params.id, { ...req.body, name, phone: phone || null }, req.user, (err, result) => {
     if (err) return res.status(500).send({ error: err });
     if (!result.success && result.reason === 'DUPLICATE') return res.status(409).send({ message: 'A terminal with this name already exists in this city' });
     if (result.affectedRows === 0) return res.status(404).send({ message: 'Terminal not found' });

@@ -5,6 +5,7 @@ const controller = require('../controllers/terminalController');
 
 router.use(verifyToken);
 router.get('/', controller.getAllTerminal);
+router.get('/route-destinations', requireRole('super_admin', 'city_admin'), controller.getRouteDestinations);
 router.get('/:id', controller.getTerminalByID);
 router.post('/', requireRole('super_admin', 'city_admin'), controller.createTerminal);
 router.patch('/:id', requireRole('super_admin', 'city_admin'), controller.updateTerminal);

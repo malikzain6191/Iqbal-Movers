@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const promisePool = pool.promise(); // wraps the SAME pool; callback-style queries elsewhere in the app keep working unaffected
+const { bookingScope, scheduleScope } = require('../utils/accessScope');
 
 // ---------------------------------------------------------------------
 // This is the one model in the project that deviates from the plain
@@ -12,14 +13,21 @@ const promisePool = pool.promise(); // wraps the SAME pool; callback-style queri
 // pool.promise(). Every OTHER model in this project stays callback-style.
 // ---------------------------------------------------------------------
 
-exports.createbooking = async ({ schedule_id, passengers, counter_user_id, terminal_id }) => {
+exports.createbooking = async ({ schedule_id, passengers, counter_user_id, terminal_id, user }) => {
   const connection = await promisePool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const [scheduleRows] = await connection.query('SELECT * FROM schedules WHERE id = ? FOR UPDATE', [schedule_id]);
+    const scope = scheduleScope(user);
+    const [scheduleRows] = await connection.query(
+      `SELECT s.* FROM schedules s WHERE s.id = ? AND ${scope.sql} FOR UPDATE`,
+      [schedule_id, ...scope.params]
+    );
     const schedule = scheduleRows[0];
-    if (!schedule || schedule.status !== 'Open') {
+    if (!schedule) {
+      throw { code: 'SCHEDULE_NOT_ACCESSIBLE', message: 'This departure is outside your assigned scope.' };
+    }
+    if (schedule.status !== 'Open') {
       throw { code: 'SCHEDULE_NOT_OPEN', message: 'This schedule is not open for booking.' };
     }
 
@@ -44,7 +52,10 @@ exports.createbooking = async ({ schedule_id, passengers, counter_user_id, termi
       `INSERT INTO bookings
         (booking_number, ticket_number, schedule_id, counter_user_id, terminal_id, fare_per_seat, total_amount, status, booking_date)
        VALUES (?,?,?,?,?,?,?, "Booked", CURDATE())`,
-      [booking_number, ticket_number, schedule_id, counter_user_id, terminal_id, schedule.fare, total_amount]
+      [
+        booking_number, ticket_number, schedule_id, counter_user_id,
+        terminal_id || schedule.departure_terminal_id, schedule.fare, total_amount
+      ]
     );
     const bookingId = bookingResult.insertId;
 
@@ -75,13 +86,19 @@ exports.createbooking = async ({ schedule_id, passengers, counter_user_id, termi
   }
 };
 
-exports.cancelbooking = async (bookingId, reason, processedBy) => {
+exports.cancelbooking = async (bookingId, reason, processedBy, user) => {
   const connection = await promisePool.getConnection();
   try {
     await connection.beginTransaction();
 
-    const [rows] = await connection.query('SELECT * FROM bookings WHERE id = ? FOR UPDATE', [bookingId]);
-    const booking = rows[0];
+    const scope = bookingScope(user);
+    const [scopedRows] = await connection.query(
+      `SELECT b.* FROM bookings b
+       JOIN schedules s ON s.id = b.schedule_id
+       WHERE b.id = ? AND ${scope.sql} FOR UPDATE`,
+      [bookingId, ...scope.params]
+    );
+    const booking = scopedRows[0];
     if (!booking) throw { code: 'NOT_FOUND', message: 'Booking not found.' };
     if (booking.status !== 'Booked') throw { code: 'INVALID_STATE', message: 'Only an active booking can be cancelled.' };
 
@@ -146,23 +163,29 @@ exports.cancelbookingsforschedule = async (scheduleId, processedBy) => {
 
 // ---- plain read queries below stay callback-style, consistent with the rest of the app ----
 
-exports.getbookings = (counterUserId, cb) => {
-  if (counterUserId) {
-    pool.query('SELECT * FROM bookings WHERE counter_user_id = ? ORDER BY created_at DESC', [counterUserId], cb);
-  } else {
-    pool.query('SELECT * FROM bookings ORDER BY created_at DESC', cb);
-  }
+exports.getbookings = (user, cb) => {
+  const scope = bookingScope(user);
+  pool.query(
+    `SELECT b.* FROM bookings b
+     JOIN schedules s ON s.id = b.schedule_id
+     WHERE ${scope.sql}
+     ORDER BY b.created_at DESC`,
+    scope.params,
+    cb
+  );
 };
 
-exports.getmanifest = (scheduleId, cb) => {
+exports.getmanifest = (scheduleId, user, cb) => {
+  const scope = scheduleScope(user);
   pool.query(
-    `SELECT bs.seat_number, p.name, p.cnic, p.mobile_number
+    `SELECT bs.seat_number, p.name, p.cnic, p.mobile_number, p.gender
      FROM bookings b
+     JOIN schedules s ON s.id = b.schedule_id
      JOIN booking_seats bs ON bs.booking_id = b.id
      JOIN passengers p ON p.id = bs.passenger_id
-     WHERE b.schedule_id = ? AND b.status = "Booked"
+     WHERE b.schedule_id = ? AND b.status = "Booked" AND ${scope.sql}
      ORDER BY bs.seat_number`,
-    [scheduleId],
+    [scheduleId, ...scope.params],
     cb
   );
 };

@@ -7,3 +7,7 @@ export function listRoutes() {
 export function createRoute(payload) {
   return http.post('/routes', payload);
 }
+
+export function updateRouteMetrics(routeId, payload) {
+  return http.patch(`/routes/${routeId}/metrics`, payload);
+}

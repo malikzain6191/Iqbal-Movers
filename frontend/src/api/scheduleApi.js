@@ -4,8 +4,8 @@ export function listSchedules() {
   return http.get('/schedules');
 }
 
-export function getAvailability(depDT, arrDT, excludeScheduleId) {
-  const query = new URLSearchParams({ departure_datetime: depDT, arrival_datetime: arrDT });
+export function getAvailability(routeId, depDT, excludeScheduleId) {
+  const query = new URLSearchParams({ route_id: routeId, departure_datetime: depDT });
   if (excludeScheduleId) query.set('exclude_schedule_id', excludeScheduleId);
   return http.get(`/schedules/availability?${query}`);
 }

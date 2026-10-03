@@ -25,6 +25,10 @@ export function listTerminals(cityId) {
   return http.get(`/terminals${query}`);
 }
 
+export function listRouteDestinations() {
+  return http.get('/terminals/route-destinations');
+}
+
 export function getTerminal(terminalId) {
   return http.get(`/terminals/${terminalId}`);
 }

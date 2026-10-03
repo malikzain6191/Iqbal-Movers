@@ -4,6 +4,7 @@ import { useLookups } from '../context/LookupsContext';
 import * as scheduleApi from '../api/scheduleApi';
 import * as bookingApi from '../api/bookingApi';
 import { routeName, vehName, drvName, fmtDT } from '../utils/lookups';
+import DataGrid from '../components/DataGrid';
 
 export default function Manifest() {
   const { user } = useAuth();
@@ -28,6 +29,7 @@ export default function Manifest() {
 
   const bookedCount = seats.filter((s) => s.status === 'Booked').length;
   const currentSchedule = schedules.find((schedule) => String(schedule.id) === String(scheduleId));
+  const currentRoute = routes.find((route) => String(route.id) === String(currentSchedule?.route_id));
 
   return (
     <>
@@ -46,15 +48,22 @@ export default function Manifest() {
               <div className="kpi"><b>{bookedCount}</b><span>Booked seats</span></div>
               <div className="kpi"><b>{seats.length - bookedCount}</b><span>Available seats</span></div>
             </div>
-            <p style={{ margin: '12px 0', fontSize: 13, color: 'var(--slate)' }}>
-              Bus: <b>{vehName(currentSchedule?.vehicle_id, vehicles)}</b> · Driver: <b>{drvName(currentSchedule?.driver_id, drivers)}</b> · Route: <b>{routeName(currentSchedule?.route_id, routes)}</b>
-            </p>
-            <table><tbody>
-              <tr><th>Seat</th><th>Passenger</th><th>CNIC</th><th>Mobile</th></tr>
-              {manifest.passengers.length ? [...manifest.passengers].sort((a, b) => a.seat_number.localeCompare(b.seat_number)).map((p) => (
-                <tr key={`${p.seat_number}-${p.name}`}><td>{p.seat_number}</td><td>{p.name}</td><td>{p.cnic}</td><td>{p.mobile_number}</td></tr>
-              )) : <tr><td colSpan={4} className="empty">No passengers booked yet.</td></tr>}
-            </tbody></table>
+            <div className="grid3" style={{ margin: '14px 0', fontSize: 13 }}>
+              <div><b>Route</b><br />{routeName(currentSchedule?.route_id, routes)}</div>
+              <div><b>Vehicle</b><br />{vehName(currentSchedule?.vehicle_id, vehicles)}</div>
+              <div><b>Driver</b><br />{currentSchedule?.driver_name || drvName(currentSchedule?.driver_id, drivers)}</div>
+              <div><b>Departure</b><br />{currentSchedule?.departure_datetime ? fmtDT(currentSchedule.departure_datetime) : '-'}</div>
+              <div><b>Arrival</b><br />{currentSchedule?.arrival_datetime ? fmtDT(currentSchedule.arrival_datetime) : '-'}</div>
+              <div><b>Distance to travel</b><br />{Number(currentRoute?.distance_km) > 0 ? `${Number(currentRoute.distance_km).toLocaleString()} km` : '-'}</div>
+              <div><b>Estimated travel time</b><br />{Number(currentRoute?.estimated_duration_minutes) > 0 ? `${Number(currentRoute.estimated_duration_minutes).toLocaleString()} min` : '-'}</div>
+            </div>
+            <DataGrid data={manifest.passengers} columns={[
+              { accessorKey: 'seat_number', header: 'Seat' },
+              { accessorKey: 'name', header: 'Passenger' },
+              { id: 'gender', header: 'Gender', accessorFn: (passenger) => ({ M: 'Male', F: 'Female', Other: 'Other' }[passenger.gender] || '-') },
+              { accessorKey: 'cnic', header: 'CNIC' },
+              { accessorKey: 'mobile_number', header: 'Mobile' }
+            ]} emptyMessage="No passengers booked yet." />
           </>
         )}
       </div></div>

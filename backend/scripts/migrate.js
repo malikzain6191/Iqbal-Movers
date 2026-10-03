@@ -5,7 +5,7 @@ const path = require('path');
 const mysql = require('mysql2');
 
 const migrationsDir = path.join(__dirname, '..', 'migrations');
-const database = process.env.DB_NAME || 'iqbal_travels_tms';
+const database = process.env.DB_NAME || 'iqbal_movers';
 
 if (!/^[A-Za-z0-9_]+$/.test(database)) {
   throw new Error('DB_NAME may contain only letters, numbers, and underscores.');
@@ -49,12 +49,12 @@ async function migrate() {
       await connection.query('INSERT INTO schema_migrations (name) VALUES (?)', [file]);
       console.log(`Applied: ${file}`);
     }
+  } catch (error) {
+    console.error('Database migration failed:', error.message);
+    process.exitCode = 1;
   } finally {
     await connection.end();
   }
 }
 
-migrate().catch((error) => {
-  console.error('Database migration failed:', error.message);
-  process.exitCode = 1;
-});
+migrate();

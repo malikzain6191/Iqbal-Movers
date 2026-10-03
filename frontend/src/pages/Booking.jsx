@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLookups } from '../context/LookupsContext';
 import * as scheduleApi from '../api/scheduleApi';
 import * as bookingApi from '../api/bookingApi';
-import { routeName, vehName, drvName, money, fmtDT } from '../utils/lookups';
+import { routeName, scheduleVehicleName, drvName, money, fmtDT } from '../utils/lookups';
 import { normalizeText, PERSON_NAME_PATTERN, PHONE_PATTERN } from '../utils/validation';
 import SeatMap from '../components/SeatMap';
 import Modal from '../components/Modal';
@@ -85,6 +85,7 @@ export default function Booking() {
   }
 
   const currentSchedule = availableSchedules.find((s) => String(s.id) === String(scheduleId)) || schedules.find((s) => String(s.id) === String(scheduleId));
+  const departureTime = (value) => new Date(value).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
   async function confirm() {
     setErr('');
@@ -143,7 +144,7 @@ export default function Booking() {
 
             <select value={scheduleId} onChange={(e) => { setScheduleId(e.target.value); setSelected([]); }}>
                   {availableSchedules.map((s) => (
-                <option key={s.id} value={s.id}>{routeName(s.route_id, routes)} · {fmtDT(s.departure_datetime)} · {vehName(s.vehicle_id, vehicles)}</option>
+                <option key={s.id} value={s.id}>{routeName(s.route_id, routes)} · {departureTime(s.departure_datetime)}</option>
               ))}
             </select>
             {!availableSchedules.length && (
@@ -152,7 +153,7 @@ export default function Booking() {
             {currentSchedule && (
               <>
                 <div style={{ marginTop: 14, fontSize: 13, color: 'var(--slate)' }}>
-                  Vehicle: <b>{vehName(currentSchedule.vehicle_id, vehicles)}</b> · Driver: <b>{drvName(currentSchedule.driver_id, drivers)}</b> · Fare: <b>{money(currentSchedule.fare)}</b>/seat
+                  Vehicle: <b>{scheduleVehicleName(currentSchedule, vehicles)}</b> · Driver: <b>{currentSchedule.driver_name || drvName(currentSchedule.driver_id, drivers)}</b> · Fare: <b>{money(currentSchedule.fare)}</b>/seat
                 </div>
                 <SeatMap seats={seats} selected={selected} onToggle={toggleSeat} />
               </>
@@ -196,7 +197,7 @@ export default function Booking() {
             <div className="row"><span>Ticket No.</span><b>{ticket.ticket_number}</b></div>
             <div className="row"><span>Passenger(s)</span><b>{ticket.passengers.map((p) => `${p.name} (${p.seat_number})`).join(', ')}</b></div>
             <div className="row"><span>Route</span><b>{routeName(currentSchedule?.route_id, routes)}</b></div>
-            <div className="row"><span>Bus</span><b>{vehName(currentSchedule?.vehicle_id, vehicles)}</b></div>
+            <div className="row"><span>Bus</span><b>{scheduleVehicleName(currentSchedule, vehicles)}</b></div>
             <div className="row"><span>Departure</span><b>{currentSchedule && fmtDT(currentSchedule.departure_datetime)}</b></div>
             <div className="row"><span>Fare / seat</span><b>{money(ticket.fare_per_seat)}</b></div>
             <div className="row"><span>Total Paid</span><b>{money(ticket.total_amount)}</b></div>

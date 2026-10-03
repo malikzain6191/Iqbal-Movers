@@ -10,5 +10,6 @@ router.get('/route-revenue', requireRole('super_admin', 'city_admin'), controlle
 router.get('/vehicle-utilization', requireRole('super_admin', 'city_admin'), controller.getVehicleUtilization);
 router.get('/driver-performance', requireRole('super_admin', 'city_admin'), controller.getDriverPerformance);
 router.get('/cash-collection', controller.getCashCollection);
+router.get('/trip-history', requireRole('super_admin'), controller.getTripHistory);
 
 module.exports = router;

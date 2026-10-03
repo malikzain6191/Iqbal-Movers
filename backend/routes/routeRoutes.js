@@ -5,6 +5,7 @@ const controller = require('../controllers/routeController');
 
 router.use(verifyToken);
 router.get('/', controller.getAllRoutes);
+router.patch('/:id/metrics', requireRole('super_admin', 'city_admin'), controller.updateRouteMetrics);
 router.post('/', requireRole('super_admin', 'city_admin'), controller.createRoute);
 
 module.exports = router;

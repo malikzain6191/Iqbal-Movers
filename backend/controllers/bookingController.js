@@ -38,7 +38,8 @@ exports.createBooking = async (req, res) => {
       schedule_id,
       passengers: cleanedPassengers,
       counter_user_id: req.user.id,
-      terminal_id: req.user.terminal_id || req.body.terminal_id
+      terminal_id: req.user.role === 'counter_operator' ? req.user.terminal_id : null,
+      user: req.user
     });
 
     const responseBody = { message: 'Booking created successfully', ...result };
@@ -47,6 +48,9 @@ exports.createBooking = async (req, res) => {
     logAudit(req.user.id, req.user.name, 'Booking Created', 'Booking', result.bookingId, `${result.ticket_number} · ${cleanedPassengers.length} seat(s)`);
     res.status(201).json(responseBody);
   } catch (err) {
+    if (err.code === 'SCHEDULE_NOT_ACCESSIBLE') {
+      return res.status(404).send({ message: err.message });
+    }
     if (err.code === 'SEAT_ALREADY_BOOKED' || err.code === 'SCHEDULE_NOT_OPEN') {
       return res.status(409).send({ message: err.message, code: err.code });
     }
@@ -55,8 +59,7 @@ exports.createBooking = async (req, res) => {
 };
 
 exports.listBookings = (req, res) => {
-  const counterFilter = req.user.role === 'counter_operator' ? req.user.id : null;
-  Booking.getbookings(counterFilter, (err, results) => {
+  Booking.getbookings(req.user, (err, results) => {
     if (err) return res.status(500).send({ error: err });
     res.json(results);
   });
@@ -64,7 +67,7 @@ exports.listBookings = (req, res) => {
 
 exports.cancelBooking = async (req, res) => {
   try {
-    const result = await Booking.cancelbooking(req.params.id, req.body.reason || 'Not specified', req.user.id);
+    const result = await Booking.cancelbooking(req.params.id, req.body.reason || 'Not specified', req.user.id, req.user);
     logAudit(req.user.id, req.user.name, 'Refund Issued', 'Booking', req.params.id, `Rs ${result.refund_amount}`);
     res.json({ message: 'Booking cancelled and refunded', ...result });
   } catch (err) {
@@ -75,8 +78,13 @@ exports.cancelBooking = async (req, res) => {
 };
 
 exports.getManifest = (req, res) => {
-  Booking.getmanifest(req.params.id, (err, results) => {
-    if (err) return res.status(500).send({ error: err });
-    res.json({ schedule_id: req.params.id, passengers: results });
+  const Schedule = require('../models/scheduleModel');
+  Schedule.getschedulebyIDInScope(req.params.id, req.user, (scheduleError, schedules) => {
+    if (scheduleError) return res.status(500).send({ error: scheduleError });
+    if (!schedules.length) return res.status(404).send({ message: 'Schedule not found' });
+    Booking.getmanifest(req.params.id, req.user, (err, results) => {
+      if (err) return res.status(500).send({ error: err });
+      res.json({ schedule_id: req.params.id, passengers: results });
+    });
   });
 };

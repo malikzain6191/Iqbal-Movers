@@ -16,7 +16,15 @@ const reportRoutes = require('./routes/reportRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 
 const app = express();
-app.use(cors());
+const allowedOrigins = new Set(
+	(process.env.CORS_ORIGINS || 'http://localhost:5173,http://127.0.0.1:5173')
+		.split(',')
+		.map((origin) => origin.trim())
+		.filter(Boolean)
+);
+app.use(cors({
+	origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin))
+}));
 app.use(express.json());
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

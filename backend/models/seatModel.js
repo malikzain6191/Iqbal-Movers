@@ -18,5 +18,18 @@ exports.generateseats = (scheduleId, capacity, cb) => {
 };
 
 exports.getseatsbyschedule = (scheduleId, cb) => {
-  db.query('SELECT id, seat_number, status FROM seats WHERE schedule_id = ? ORDER BY seat_number', [scheduleId], cb);
+  db.query(
+    `SELECT seat.id, seat.seat_number, seat.status,
+            (SELECT passenger.gender
+             FROM booking_seats booked_seat
+             JOIN bookings booking ON booking.id = booked_seat.booking_id
+             JOIN passengers passenger ON passenger.id = booked_seat.passenger_id
+             WHERE booked_seat.seat_id = seat.id AND booking.status = 'Booked'
+             LIMIT 1) AS gender
+     FROM seats seat
+     WHERE seat.schedule_id = ?
+     ORDER BY seat.seat_number`,
+    [scheduleId],
+    cb
+  );
 };

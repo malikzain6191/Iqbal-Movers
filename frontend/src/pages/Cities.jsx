@@ -6,6 +6,7 @@ import { cityName } from '../utils/lookups';
 import { CITY_NAME_PATTERN, PHONE_PATTERN, normalizeText, normalizedKey, optionalPhoneIsValid } from '../utils/validation';
 import Modal from '../components/Modal';
 import StatusBadge from '../components/StatusBadge';
+import DataGrid from '../components/DataGrid';
 
 export default function Cities() {
   const { user } = useAuth();
@@ -59,12 +60,11 @@ export default function Cities() {
         <div className="card">
           <div className="hd"><h3>Cities</h3></div>
           <div className="bd">
-            <table><tbody>
-              <tr><th>City</th><th>Terminals</th><th>Status</th></tr>
-              {cities.map((c) => (
-                <tr key={c.id}><td><b>{c.name}</b></td><td>{terminals.filter((t) => t.city_id === c.id).length}</td><td><StatusBadge status={c.status} /></td></tr>
-              ))}
-            </tbody></table>
+            <DataGrid data={cities.map((city) => ({ ...city, terminal_count: terminals.filter((terminal) => String(terminal.city_id) === String(city.id)).length }))} columns={[
+              { accessorKey: 'name', header: 'City', cell: ({ row }) => <b>{row.original.name}</b> },
+              { accessorKey: 'terminal_count', header: 'Terminals', accessorFn: (city) => Number(city.terminal_count) },
+              { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> }
+            ]} />
           </div>
         </div>
         <div className="card">
@@ -73,12 +73,12 @@ export default function Cities() {
             {canEdit && <button className="btn sm" onClick={() => { setForm({ name: '', city_id: '' }); setErr(''); setModal('terminal'); }}>+ Add Terminal</button>}
           </div>
           <div className="bd">
-            <table><tbody>
-              <tr><th>Terminal</th><th>City</th><th>Phone</th><th>Status</th></tr>
-              {terminals.map((t) => (
-                <tr key={t.id}><td>{t.name}</td><td>{cityName(t.city_id, cities)}</td><td>{t.phone}</td><td><StatusBadge status={t.status} /></td></tr>
-              ))}
-            </tbody></table>
+            <DataGrid data={terminals} columns={[
+              { accessorKey: 'name', header: 'Terminal' },
+              { id: 'city', header: 'City', accessorFn: (terminal) => cityName(terminal.city_id, cities) },
+              { accessorKey: 'phone', header: 'Phone' },
+              { accessorKey: 'status', header: 'Status', cell: ({ row }) => <StatusBadge status={row.original.status} /> }
+            ]} />
           </div>
         </div>
       </div>

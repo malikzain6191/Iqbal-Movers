@@ -4,7 +4,7 @@ const { logAudit } = require('../utils/audit');
 const { isOptionalPositiveInteger, isOptionalPositiveNumber, isPositiveId } = require('../utils/validation');
 
 exports.getAllRoutes = (req, res) => {
-  Route.getallroutes((err, results) => {
+  Route.getallroutes(req.user, (err, results) => {
     if (err) return res.status(500).send({ error: err });
     res.json(results);
   });
@@ -15,13 +15,15 @@ exports.createRoute = (req, res) => {
   if (!isPositiveId(origin_terminal_id) || !isPositiveId(destination_terminal_id)) {
     return res.status(400).send({ message: 'origin_terminal_id and destination_terminal_id are required' });
   }
-  if (!isOptionalPositiveNumber(distance_km) || !isOptionalPositiveInteger(estimated_duration_minutes)) {
-    return res.status(400).send({ message: 'Distance and duration must be positive numbers when provided' });
+  if (!isOptionalPositiveNumber(distance_km) || !isOptionalPositiveInteger(estimated_duration_minutes)
+    || !Number.isFinite(Number(distance_km)) || Number(distance_km) <= 0
+    || !Number.isInteger(Number(estimated_duration_minutes)) || Number(estimated_duration_minutes) <= 0) {
+    return res.status(400).send({ message: 'Distance and travel time are required and must be greater than zero' });
   }
 
   // Name is built server-side from real terminal rows — never trust a
   // client-supplied display name for this.
-  Terminal.getterminalbyID(origin_terminal_id, (err, originResults) => {
+  Terminal.getterminalbyIDInScope(origin_terminal_id, req.user, (err, originResults) => {
     if (err) return res.status(500).send({ error: err });
     Terminal.getterminalbyID(destination_terminal_id, (err2, destResults) => {
       if (err2) return res.status(500).send({ error: err2 });
@@ -42,6 +44,29 @@ exports.createRoute = (req, res) => {
         logAudit(req.user.id, req.user.name, 'Route Creation', 'Route', result.insertedId, name);
         res.status(201).send({ message: 'Route created successfully', routeId: result.insertedId });
       });
+    });
+  });
+};
+
+exports.updateRouteMetrics = (req, res) => {
+  const { distance_km, estimated_duration_minutes } = req.body;
+  if (!isOptionalPositiveNumber(distance_km) || !isOptionalPositiveInteger(estimated_duration_minutes)
+    || !Number.isFinite(Number(distance_km)) || Number(distance_km) <= 0
+    || !Number.isInteger(Number(estimated_duration_minutes)) || Number(estimated_duration_minutes) <= 0) {
+    return res.status(400).send({ message: 'Distance and travel time are required and must be greater than zero' });
+  }
+
+  Route.getroutebyIDInScope(req.params.id, req.user, (scopeError, routes) => {
+    if (scopeError) return res.status(500).send({ error: scopeError });
+    if (!routes.length) return res.status(404).send({ message: 'Route not found' });
+    Route.updateroutemetrics(req.params.id, {
+      distance_km: Number(distance_km),
+      estimated_duration_minutes: Number(estimated_duration_minutes)
+    }, (error, result) => {
+      if (error) return res.status(500).send({ error });
+      if (!result.affectedRows) return res.status(404).send({ message: 'Route not found' });
+      logAudit(req.user.id, req.user.name, 'Route Update', 'Route', req.params.id, `${distance_km} km / ${estimated_duration_minutes} minutes`);
+      res.send({ message: 'Route metrics updated successfully' });
     });
   });
 };

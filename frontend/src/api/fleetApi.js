@@ -8,6 +8,10 @@ export function getVehicle(vehicleId) {
   return http.get(`/vehicles/${vehicleId}`);
 }
 
+export function getVehicleItinerary(vehicleId) {
+  return http.get(`/vehicles/${vehicleId}/itinerary`);
+}
+
 export function createVehicle(payload) {
   return http.post('/vehicles', payload);
 }

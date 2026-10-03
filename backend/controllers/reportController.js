@@ -1,11 +1,12 @@
 const Report = require('../models/reportModel');
+const { isPositiveId } = require('../utils/validation');
 
-function loadContext(counterUserId, cb) {
-  Report.rawbookings(counterUserId, (err, bookings) => {
+function loadContext(user, cb) {
+  Report.rawbookings(user, (err, bookings) => {
     if (err) return cb(err);
-    Report.schedulesbasic((err2, schedules) => {
+    Report.schedulesbasic(user, (err2, schedules) => {
       if (err2) return cb(err2);
-      Report.seatcountsbyschedule((err3, seatCounts) => {
+      Report.seatcountsbyschedule(user, (err3, seatCounts) => {
         if (err3) return cb(err3);
         cb(null, { bookings, schedules, seatCounts });
       });
@@ -14,9 +15,9 @@ function loadContext(counterUserId, cb) {
 }
 
 exports.getTodayDashboard = (req, res) => {
-  Report.todaystats((err, statsRows) => {
+  Report.todaystats(req.user, (err, statsRows) => {
     if (err) return res.status(500).send({ error: err });
-    Report.upcomingdepartures((err2, upcoming) => {
+    Report.upcomingevents(req.user, (err2, upcoming) => {
       if (err2) return res.status(500).send({ error: err2 });
       res.json({ ...statsRows[0], upcoming });
       // NOTE: occupancy_pct is left out here deliberately — it needs total
@@ -27,8 +28,7 @@ exports.getTodayDashboard = (req, res) => {
 };
 
 exports.getDailySales = (req, res) => {
-  const counterFilter = req.user.role === 'counter_operator' ? req.user.id : null;
-  loadContext(counterFilter, (err, ctx) => {
+  loadContext(req.user, (err, ctx) => {
     if (err) return res.status(500).send({ error: err });
     const byDate = {};
     ctx.bookings.forEach((b) => {
@@ -43,9 +43,9 @@ exports.getDailySales = (req, res) => {
 };
 
 exports.getRouteRevenue = (req, res) => {
-  loadContext(null, (err, ctx) => {
+  loadContext(req.user, (err, ctx) => {
     if (err) return res.status(500).send({ error: err });
-    Report.routesbasic((err2, routes) => {
+    Report.routesbasic(req.user, (err2, routes) => {
       if (err2) return res.status(500).send({ error: err2 });
 
       const schedIdsByRoute = {};
@@ -70,9 +70,9 @@ exports.getRouteRevenue = (req, res) => {
 };
 
 exports.getVehicleUtilization = (req, res) => {
-  loadContext(null, (err, ctx) => {
+  loadContext(req.user, (err, ctx) => {
     if (err) return res.status(500).send({ error: err });
-    Report.vehiclesbasic((err2, vehicles) => {
+    Report.vehiclesbasic(req.user, (err2, vehicles) => {
       if (err2) return res.status(500).send({ error: err2 });
 
       const schedIdsByVehicle = {};
@@ -85,7 +85,9 @@ exports.getVehicleUtilization = (req, res) => {
         const schedIds = schedIdsByVehicle[v.id] || [];
         const relevant = ctx.bookings.filter((b) => schedIds.includes(b.schedule_id) && b.status === 'Booked');
         return {
-          vehicle: v.vehicle_number,
+          vehicle: [v.vehicle_number, v.registration_number]
+            .filter(Boolean)
+            .join(' · '),
           trips: schedIds.length,
           revenue: relevant.reduce((a, b) => a + Number(b.total_amount), 0),
           passengers: relevant.reduce((a, b) => a + b.seat_count, 0)
@@ -97,9 +99,9 @@ exports.getVehicleUtilization = (req, res) => {
 };
 
 exports.getDriverPerformance = (req, res) => {
-  loadContext(null, (err, ctx) => {
+  loadContext(req.user, (err, ctx) => {
     if (err) return res.status(500).send({ error: err });
-    Report.driversbasic((err2, drivers) => {
+    Report.driversbasic(req.user, (err2, drivers) => {
       if (err2) return res.status(500).send({ error: err2 });
 
       const schedIdsByDriver = {};
@@ -124,10 +126,9 @@ exports.getDriverPerformance = (req, res) => {
 };
 
 exports.getCashCollection = (req, res) => {
-  const counterFilter = req.user.role === 'counter_operator' ? req.user.id : null;
-  loadContext(counterFilter, (err, ctx) => {
+  loadContext(req.user, (err, ctx) => {
     if (err) return res.status(500).send({ error: err });
-    Report.usersbasic((err2, users) => {
+    Report.usersbasic(req.user, (err2, users) => {
       if (err2) return res.status(500).send({ error: err2 });
 
       const nameById = {};
@@ -142,5 +143,32 @@ exports.getCashCollection = (req, res) => {
       });
       res.json(Object.entries(byCounter).map(([counter, v]) => ({ counter, ...v })));
     });
+  });
+};
+
+exports.getTripHistory = (req, res) => {
+  const dateScope = req.query.date_scope || 'today';
+  const driverId = req.query.driver_id || null;
+  const vehicleId = req.query.vehicle_id || null;
+  if (!['today', 'all'].includes(dateScope)) {
+    return res.status(400).send({ message: 'date_scope must be today or all' });
+  }
+  if ((driverId && !isPositiveId(driverId)) || (vehicleId && !isPositiveId(vehicleId))) {
+    return res.status(400).send({ message: 'driver_id and vehicle_id must be positive integers' });
+  }
+
+  Report.getTripHistory({ dateScope, driverId, vehicleId }, (err, trips) => {
+    if (err) return res.status(500).send({ error: err });
+    const now = Date.now();
+    res.json(trips.map((trip) => ({
+      ...trip,
+      trip_state: trip.status === 'Cancelled'
+        ? 'Cancelled'
+        : new Date(trip.departure_datetime).getTime() > now
+          ? 'Planned'
+          : new Date(trip.arrival_datetime).getTime() > now
+            ? 'In progress'
+            : 'Completed'
+    })));
   });
 };

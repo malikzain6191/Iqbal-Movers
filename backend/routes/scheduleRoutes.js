@@ -6,6 +6,7 @@ const bookingController = require('../controllers/bookingController');
 
 router.use(verifyToken);
 router.get('/availability', requireRole('super_admin', 'city_admin'), controller.getAvailability);
+router.get('/incoming', requireRole('city_admin'), controller.getIncomingSchedules);
 router.get('/', controller.getAllSchedules);
 router.get('/:id/seats', controller.getScheduleSeats);
 router.get('/:id/manifest', bookingController.getManifest);

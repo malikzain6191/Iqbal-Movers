@@ -1,11 +1,14 @@
 const db = require('../config/db');
+const { cityScope } = require('../utils/accessScope');
 
-exports.getallcity = (cb) => {
-  db.query('SELECT * FROM cities', cb);
+exports.getallcity = (user, cb) => {
+  const scope = cityScope(user, 'c');
+  db.query(`SELECT c.* FROM cities c WHERE ${scope.sql}`, scope.params, cb);
 };
 
-exports.getcitybyID = (id, cb) => {
-  db.query('SELECT * FROM cities WHERE id = ?', [id], cb);
+exports.getcitybyID = (id, user, cb) => {
+  const scope = cityScope(user, 'c');
+  db.query(`SELECT c.* FROM cities c WHERE c.id = ? AND ${scope.sql}`, [id, ...scope.params], cb);
 };
 
 exports.createcity = (city, cb) => {

@@ -3,14 +3,14 @@ const { logAudit } = require('../utils/audit');
 const { isCityName, normalizeText } = require('../utils/validation');
 
 exports.getAllCity = (req, res) => {
-  City.getallcity((err, results) => {
+  City.getallcity(req.user, (err, results) => {
     if (err) return res.status(500).send({ error: err });
     res.json(results);
   });
 };
 
 exports.getCityByID = (req, res) => {
-  City.getcitybyID(req.params.id, (err, results) => {
+  City.getcitybyID(req.params.id, req.user, (err, results) => {
     if (err) return res.status(500).send({ error: err });
     if (results.length === 0) return res.status(404).send({ message: 'City not found' });
     res.json(results[0]);
